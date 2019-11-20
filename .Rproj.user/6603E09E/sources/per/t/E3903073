@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1574255057427.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2847037182",
+    "id" : "E3903073",
+    "lastKnownWriteTime" : 1574286595,
+    "last_content_update" : 1574286595211,
+    "path" : "J:/Christine_temp/Arctic shorebird RSF/Version 2 - Manuscript/data cleaning scripts/02_prep_PRISM_data.R",
+    "project_path" : "data cleaning scripts/02_prep_PRISM_data.R",
+    "properties" : {
+        "cursorPosition" : "27,41",
+        "scrollLine" : "16",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
