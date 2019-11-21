@@ -12,7 +12,7 @@ cols_bigdata <- data.frame(colnames(bigdata))
 
 
 cols <- c(17, 36, 41:42, 45, 331:338, 344, 677:714, 77, 84, 90, 97, 77:302)
-cols <- c(77, 84, 90, 97)
+cols <- c(313:322)
 
 test <- bigdata %>%
   #filter(!is.na(UTM_44_Easting)) %>%
