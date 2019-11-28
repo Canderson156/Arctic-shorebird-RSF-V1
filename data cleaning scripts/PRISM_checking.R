@@ -1,3 +1,57 @@
+#notes about specific columns
+
+
+length(unique(bigdata$Standardized_Plot_Name))
+
+table(bigdata$Year)
+table(bigdata$Month) #477 NA
+
+
+#checking start, finidh, durations
+x <- select(bigdata, Start_time_1, Finish_time_1, DERIVED_Survey_Duration..hours.minutes., Field_recorded_Survey_Duration_hours)
+# very few have field recorded survey hours
+# the dreived durations arn't calculated properly 
+# two plots have both start and finish times of 00:00 which seems like an error
+# start and finish still have times in two different formats which is annoying
+
+table(is.na(bigdata$Start_time_1))
+table(is.na(bigdata$Finish_time_1))
+
+
+
+table(bigdata$Region_name)
+
+#what are the plots that don't have a region?
+
+x <- filter(bigdata, is.na(Region_name))
+
+# Note from Tyler that they are outside of the region
+
+
+table(bigdata$Sub_region_code)
+
+#what are the plots that have a region but no subregion?
+
+x <- filter(bigdata, is.na(Sub_region_code))
+
+table(x$Region_name) #same 89 above that have no region, 78 in foxe basin, 3 in north archipelago
+
+
+
+#whats going on in region 10
+
+test <- filter(bigdata, Region_code == 10)
+table(test$Year, test$Sub_region_code)
+# are the 3 that don't have a subregion code a mistake?
+
+
+
+
+
+
+
+
+
 #looking at the structure of the whole bigdata dataset
 
 str(bigdata, list.len=ncol(df))
@@ -41,6 +95,82 @@ test$same <- apply(test, 1, all.identical)
 
 
 h <- head(prism)
+
+
+
+
+
+#checking month 
+
+
+test <- prism %>%
+  filter(month == "not applicable")
+
+
+
+#looking at relationship between survey method, plot type, and plot shape
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#checking species x group combinations
+
+
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Shorebirds"])
+
+
+
+
+# what are the entires where group == NA
+# they are all incidental observatons or habitat descriptions
+
+test <- bigdata %>%
+  filter(is.na(Group))
+
+
+
+
+#checking if species and groups match up
+
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Shorebirds"])
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Cranes"])
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Grouse"])
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Mammal"])
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Owls"])
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Passerines"])
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Waterfowl"])
+table(bigdata$Standardized_Species_Code[bigdata$Group == "Gull"])
+
+
+
+
+
+
+
+#### looking for rows where one of the counts seems like it should be there but it is an NA
+
+b2 <- mutate(bigdata, total_birds = (Count_Nests_found*2) + (Count_Probable_nest*2) + (Count_Pairs*2) + Count_Male + Count_Female + Count_Unknown_sex)
+b2 <- b2 %>%
+  filter(is.na(total_birds)) %>%
+  filter(Sighting_code == 1) %>%
+  filter(Survey_method == "rapid")
+
+
+
+
+
+
+
 
 #### Checking functions created by Laurent
 
