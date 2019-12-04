@@ -1,6 +1,348 @@
 #notes about specific columns
 
 
+
+
+# how many people surveyed each plot? 
+
+table(bigdata$n_surveyors)
+
+
+#why did some have 0 surveyors
+check <- bigdata %>%
+  filter(n_surveyors == 0)
+
+table(check$Plot_type)
+#they were all intensives
+
+
+#are any regions missing intensive plots?
+
+intensive <- allplots %>%
+  filter(Plot_type == "INTENSIVE")
+
+
+  
+
+
+
+
+#which plots were surveyed multiple times
+
+
+
+####SAME PLOT SAME YEAR
+sameplot_sameyear <- allplots %>%
+  group_by(Plot, Year) %>%
+  add_tally(name = "n_surveys") %>%
+  filter(n > 1)
+
+spsy_rapid <- sameplot_sameyear %>%
+  filter(Plot_type == "RAPID")
+
+spsy_intensive <- sameplot_sameyear %>%
+  filter(Plot_type == "INTENSIVE")
+
+spsy_plots <- unique(sameplot_sameyear$Plot)
+
+spsy_full <- bigdata %>%
+  filter(Standardized_Plot_Name %in% spsy_plots) %>%
+  select(Plot = Standardized_Plot_Name, #2855 unique plots
+         Sighting_code_short,
+         Survey_Lead,
+         Year, #1994-2019
+         Month, #mostly June, some July, 475 "not applicable"
+         Day,
+         Date,
+         yday,
+         Region_name, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
+         Region_code, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
+         Sub_region_name, #170 plots with NAs. 89 as above. 78 in Foxe basin becasue of differences in how subregions were calculated over time (2019 had no subregions). 3 in North Archipelago are confusing, but may stem from weird subregions that overlap near Alert (see email from Laurent RE Tyler's map of subregions)
+         Sub_region_code, #same as above
+         Plot_type,
+         Survey_method,
+         Plot_Shape,
+         Quality_1 = GIS_Habitat_Quality_2_Code,
+         Quality_2 = GIS_Habitat_Quality_1_Code, # how were these defined, when were they changed, which one is the one we should use, are these being redone?
+         Prop_surveyed = Proportion_of_Plot_surveyed, 
+         Selection_method = Plot_Selection_Method, # why are there so many field selected plots?
+         Plot_area = Plot_area_km2,
+         Sighting_code, 
+         Species = Standardized_Species_Code,  #XXXX means nothing was observed
+         Group,
+         Count_Probable_nest,
+         Count_Pairs,
+         Count_Male,
+         Count_Female,
+         Count_Unknown_sex)
+
+
+spsy_full <- prism %>%
+  filter(Plot %in% spsy_plots) %>%
+  mutate(plot_date = paste(Plot, Date)) %>%
+  group_by(plot_date) %>%
+  add_tally(total_birds)
+
+
+ggplot(spsy_full, aes(x = yday, y = n)) +
+  geom_point() + 
+  facet_wrap(~Region_name)
+
+
+
+spsy_r10 <- sameplot_sameyear %>%
+  filter(Plot %in% spsy_plots) %>%
+  filter(Region_code == 10)
+
+
+
+#how many surveyors were there
+
+for(i in 1:nrow(spsy_r10)) {
+  spsy_r10$n_surveyors[i] <- count.not.na(c(
+    spsy_r10$Surveyor_1_Initials[i],
+    spsy_r10$Surveyor_2_Initials[i],
+    spsy_r10$Surveyor_3_Initials[i],
+    spsy_r10$Surveyor_4_Initials[i], 
+    spsy_r10$Surveyor_5_Initials[i],
+    spsy_r10$Surveyor_6_Initials[i]))
+}
+
+#try doing this to allplots and then retaining it in the proceeding datasets, allows to look at just plot rather than observations
+  
+table(spsy_r10$n_surveyors)      
+           
+
+
+spsy_r10X <- spsy_r10 %>%
+  filter(Sighting_code == 1) %>%
+  filter(Survey_method == "rapid") %>%
+  select(Plot = Standardized_Plot_Name, #2855 unique plots
+       Sighting_code_short,
+       Survey_Lead,
+       Year, #1994-2019
+       Month, #mostly June, some July, 475 "not applicable"
+       Day,
+       Date,
+       yday,
+       Region_name, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
+       Region_code, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
+       Sub_region_name, #170 plots with NAs. 89 as above. 78 in Foxe basin becasue of differences in how subregions were calculated over time (2019 had no subregions). 3 in North Archipelago are confusing, but may stem from weird subregions that overlap near Alert (see email from Laurent RE Tyler's map of subregions)
+       Sub_region_code, #same as above
+       Plot_type,
+       Survey_method,
+       Plot_Shape,
+       Quality_1 = GIS_Habitat_Quality_2_Code,
+       Quality_2 = GIS_Habitat_Quality_1_Code, # how were these defined, when were they changed, which one is the one we should use, are these being redone?
+       Prop_surveyed = Proportion_of_Plot_surveyed, 
+       Selection_method = Plot_Selection_Method, # why are there so many field selected plots?
+       Plot_area = Plot_area_km2,
+       Sighting_code, 
+       Species = Standardized_Species_Code,  #XXXX means nothing was observed
+       Group,
+       Count_Probable_nest,
+       Count_Pairs,
+       Count_Male,
+       Count_Female,
+       Count_Unknown_sex,
+       n_surveyors) %>%
+  mutate(plot_date = paste(Plot, Date))
+
+
+
+
+test <- bigdata %>%
+  filter(Standardized_Plot_Name == "ALE-3840") %>%
+  select(1:50)
+
+
+test <- sameplot_sameyear %>%
+  filter(Plot == "ALE-3840")
+
+
+
+### SAME PLOT, MULTIPLE YEARS
+
+msurv <- allplots %>%
+  group_by(Plot) %>%
+  add_tally() %>%
+  filter(n > 1) %>%
+  rename(n_surveys = n) 
+
+years <- msurv %>%
+  summarize(n_distinct(Year)) %>%
+  rename(n_years = 'n_distinct(Year)')
+
+msurv <- merge(msurv, years)
+
+msurv <- msurv %>%
+  filter(n_years > 1)
+
+msurv_industry <- msurv %>%
+  filter(Survey_Lead == "Industry")
+
+msurv_intensive <- msurv %>%
+  filter(Plot_type == "INTENSIVE")
+
+msurv_rapid <- msurv %>%
+  filter(Plot_type == "RAPID") %>%
+  filter(Survey_Lead != "Industry")
+
+redone <- msurv %>%
+  filter(Year == 2019) %>%
+  select(Plot) %>%
+  unique()
+redone <- as.vector(redone$Plot)  
+
+msurv_rapid <- msurv_rapid %>%
+  filter(Plot %notin% redone)
+
+PCI <- msurv_rapid %>%
+  filter(Region_code == 3)
+
+msurv_rapid <- msurv_rapid %>%
+  filter(Region_code != 3)
+
+
+
+
+
+
+
+
+### why were plots field selected?
+
+field<- allplots %>%
+  filter(Selection_method == "field selected")
+
+
+field_industry <- allplots %>%
+  filter(Selection_method == "field selected") %>%
+  filter(Survey_Lead == "Industry") 
+
+find_sum <- field_industry %>%
+  group_by(Sub_region_name) %>%
+  summarize(n_distinct(Plot))
+
+field_intensive <- allplots %>%
+  filter(Selection_method == "field selected") %>%
+  filter(Survey_Lead != "Industry") %>%
+  filter(Plot_type == "INTENSIVE")
+
+
+fint_sum <- field_intensive  %>%
+  group_by(Sub_region_name) %>%
+  summarize(n_distinct(Plot))
+
+
+
+field_rapid <- allplots %>%
+  filter(Selection_method == "field selected") %>%
+  filter(Survey_Lead != "Industry") %>%
+  filter(Plot_type != "INTENSIVE")
+
+fr_sum <- field_rapid  %>%
+  group_by(Region_name) %>%
+  summarize(n_distinct(Plot))
+
+
+
+
+
+
+
+#checking to see if the results seem biased at all by field selection
+#create a new column that categorizes into 5 groups:
+#gis selected, field modified, field selected industry, field selected intensive, and field selected other
+
+
+
+prism <- prism %>%
+  mutate(comparison = Selection_method, 
+         comparison = ifelse(Selection_method == "field selected" & Survey_Lead == "Industry", "field selected - industry", comparison),
+         comparison = ifelse(Selection_method == "field selected" & Plot_type == "INTENSIVE", "field selected - intensive", comparison),
+         comparison = ifelse(comparison == "field selected", "field selected - other", comparison))
+                             
+
+
+
+#compare prism or allplots comparisons to see if counts seem biased
+  #if they aren;t, does it matter if the habitats were biased?
+
+
+
+
+
+
+### why were plots gis selected field modified?
+
+
+
+
+
+fmgs <- allplots %>%
+  filter(Selection_method == "field modified gis selected")
+
+
+fmgs_sum <- fmgs  %>%
+  group_by(Region_name) %>%
+  summarize(n_distinct(Plot))
+
+
+
+
+
+
+
+
+
+
+
+
+#checking the field selected comments
+
+rmcols <- which(1:814 %notin% c(1:3, 83:306, 342, 421:814))
+
+fplots <- bigdata %>%
+  filter(Standardized_Plot_Name %in% allplots$Plot[allplots$Selection_method != "gis selected"]) %>%
+  filter(Survey_Lead != "Industry") %>%
+  filter(Plot_type != "INTENSIVE") %>%
+  filter(Survey_method == "rapid") %>%
+  filter(Plot_type !="RECONNAISSANCE") %>%
+  select(rmcols) %>%
+  distinct()
+  
+  
+write.csv(fplots, "field_selected_modified.csv", na = "")
+#can NAs be exported as blanks?
+
+
+
+# what if I just used the GIS ones?
+#all: 2540 plots
+#only gis selected: 1480 plots
+#filed selected or field modified: 1060 plots
+
+
+test <- allplots %>%
+  filter(Selection_method == "gis selected")
+
+
+
+
+
+#what are the different sighting codes
+
+sighting_codes <- bigdata %>%
+  select(Sighting_code, Sighting_code_short) %>%
+  distinct()
+
+
+
+
+
+
+
 length(unique(bigdata$Standardized_Plot_Name))
 
 table(bigdata$Year)
@@ -164,6 +506,24 @@ b2 <- b2 %>%
   filter(is.na(total_birds)) %>%
   filter(Sighting_code == 1) %>%
   filter(Survey_method == "rapid")
+
+
+
+#looking to see which columns I need to change for the plot where I eeded to create the sighting code = 1 row
+
+test <- vector()
+for(i in 1:ncol(add)) {
+  test[i] <- identical(add[1,i], add[2,i])
+}
+
+
+z <- which(test == FALSE)
+check <- add[,z]
+
+
+
+
+
 
 
 

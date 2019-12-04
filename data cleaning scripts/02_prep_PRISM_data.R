@@ -17,9 +17,7 @@
 
 
 
-# Read in full PRISM dataset
-bigdata_raw <-read.csv("data/PRISM/PRISM 1994 to 2019.csv"
-                , stringsAsFactors = FALSE, na.strings=c("", "NA"))
+
 
 
 # Create a version for editing / use for resetting without having to re-load from csv
@@ -51,6 +49,11 @@ bigdata <- bigdata %>%
 
 
 
+#adding day of year variable
+
+bigdata$yday <- yday(bigdata$Date)
+
+
 
 # fixing capitalizations to make all consistent within a variable
 
@@ -76,16 +79,52 @@ bigdata <- bigdata %>%
   mutate(Group = ifelse(Group == "not recorded", NA, Group))
   
 
+#add a row for the plot that has no on plot observation row
+
+add <- filter(bigdata, Standardized_Plot_Name == "KWI-1314B") %>%
+  filter(Standardized_Species_Code == first(Standardized_Species_Code)) %>%
+  mutate(Standardized_Species_Code = "XXXX") %>%
+  mutate(Sighting_code = 1) %>%
+  mutate_at(c("Count_Nests_found", 
+              "Count_Probable_nest", "Count_Pairs", "Count_Male", 
+              "Count_Female", "Count_Unknown_sex"), function (x) x*0) %>%
+  mutate(Group = NA) %>%
+  mutate(Sighting_code_short = "on plot") %>%
+  mutate(Sighting_code_desc = "Sighting of birds inside the plot boundaries.")
+  
+bigdata <- rbind(bigdata, add)
+rm(add)
+
+
+
+
+
+for(i in 1:nrow(bigdata)) {
+  bigdata$n_surveyors[i] <- count.not.na(c(
+    bigdata$Surveyor_1_Initials[i],
+    bigdata$Surveyor_2_Initials[i],
+    bigdata$Surveyor_3_Initials[i],
+    bigdata$Surveyor_4_Initials[i], 
+    bigdata$Surveyor_5_Initials[i],
+    bigdata$Surveyor_6_Initials[i]))
+}
+
+
+
+
+
 
 
 
 # select only the columns containing required data
 prism <- dplyr::select(bigdata,
                        Plot = Standardized_Plot_Name, #2855 unique plots
+                       Survey_Lead,
                        Year, #1994-2019
                        Month, #mostly June, some July, 475 "not applicable"
                        Day,
                        Date,
+                       yday,
                        Region_name, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
                        Region_code, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
                        Sub_region_name, #170 plots with NAs. 89 as above. 78 in Foxe basin becasue of differences in how subregions were calculated over time (2019 had no subregions). 3 in North Archipelago are confusing, but may stem from weird subregions that overlap near Alert (see email from Laurent RE Tyler's map of subregions)
@@ -106,7 +145,8 @@ prism <- dplyr::select(bigdata,
                        Count_Pairs,
                        Count_Male,
                        Count_Female,
-                       Count_Unknown_sex)
+                       Count_Unknown_sex,
+                       n_surveyors)
 
 
 #start = Start_time_1,
@@ -135,15 +175,19 @@ prism <- filter(prism, Sighting_code == 1)
 prism <- prism %>%
   mutate_at(c("Count_Nests_found", 
               "Count_Probable_nest", "Count_Pairs", "Count_Male", 
-              "Count_Female", "Count_Unknown_sex"), if.na)
+              "Count_Female", "Count_Unknown_sex"), if.na.0)
 
 
 
 #create a total birds column
 
-prism <- mutate(prism, total_birds = (Count_Nests_found*2) + (Count_Probable_nest*2) + (Count_Pairs*2) + Count_Male + Count_Female + Count_Unknown_sex)
+prism <- prism %>%
+  mutate(total_birds = (Count_Nests_found*2) + (Count_Probable_nest*2) + (Count_Pairs*2) + Count_Male + Count_Female + Count_Unknown_sex) %>%
+  mutate(plot_date = paste(Plot, Date)) 
 
-
+#%>%
+#  group_by(plot_date) %>%
+#  add_tally(total_birds)
 
 
 
@@ -157,7 +201,44 @@ prism <- mutate(prism, total_birds = (Count_Nests_found*2) + (Count_Probable_nes
 #233 have plot areas bigger than 400 x 400 - what's the deal?
 
 
-test <- filter(bigdata, Standardized_Plot_Name == "KWI-1314B")
+
+
+
+
+#create a dataset of all surveyed plots
+
+allplots <- dplyr::select(prism,
+                          Plot,
+                          Survey_Lead,
+                          Year, 
+                          Month, 
+                          Day,
+                          Date,
+                          yday,
+                          Region_name, 
+                          Region_code, 
+                          Sub_region_name, 
+                          Sub_region_code, 
+                          Plot_type,
+                          Survey_method,
+                          Plot_Shape,
+                          Quality_1,
+                          Quality_2, 
+                          Prop_surveyed, 
+                          Selection_method, 
+                          Plot_area,
+                          n_surveyors, 
+                          comparison)
+
+allplots <- distinct(allplots) #2540 unique plots, 747 were surveyed more than once
+
+
+#~300 plots were surveyed by 3 or more people
+
+
+
+
+
 
 
 
@@ -174,22 +255,6 @@ test <- filter(bigdata, Standardized_Plot_Name == "KWI-1314B")
 
 
 
-
-## all geogrpahic data should be extracted from the GIS files as if may be unreliable in the excel spreadsheet: 
-
-# region
-# subregion
-# plot coordinates
-# plot area
-# quality? others? what else is in the GIS files?
-
-
-
-
-# compare GIS data vs excel data
-
-#Weird shapes in excel file - do we see the same weird shapes in GIS files? 
-#do the GIS files represent what WAS done or what SHOUld have been done on paper?
 
 
 
