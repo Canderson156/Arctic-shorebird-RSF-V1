@@ -3,6 +3,30 @@
 
 
 
+
+
+
+
+#looking at the plots that contained human development
+
+hd <- allplots %>%
+  filter(Human_development_details != "not recorded" & Human_development_details != " ")
+
+
+#How many of the indusry plots have human development details
+
+ind <- allplots %>%
+  filter(Survey_Lead == "Industry")
+
+
+
+
+
+
+
+
+
+
 # how many people surveyed each plot? 
 
 table(bigdata$n_surveyors)
@@ -25,8 +49,6 @@ intensive <- allplots %>%
   
 
 
-
-
 #which plots were surveyed multiple times
 
 
@@ -35,7 +57,12 @@ intensive <- allplots %>%
 sameplot_sameyear <- allplots %>%
   group_by(Plot, Year) %>%
   add_tally(name = "n_surveys") %>%
-  filter(n > 1)
+  filter(n_surveys > 1)
+
+spsy <- prism %>%
+  filter(Plot %in% sameplot_sameyear$Plot) %>%
+  select(plot_date, Species, total_birds) %>%
+  arrange(Species, plot_date)
 
 spsy_rapid <- sameplot_sameyear %>%
   filter(Plot_type == "RAPID")
@@ -165,9 +192,8 @@ test <- sameplot_sameyear %>%
 
 msurv <- allplots %>%
   group_by(Plot) %>%
-  add_tally() %>%
-  filter(n > 1) %>%
-  rename(n_surveys = n) 
+  add_tally(name = "n_surveys") %>%
+  filter(n_surveys > 1)
 
 years <- msurv %>%
   summarize(n_distinct(Year)) %>%
@@ -177,6 +203,7 @@ msurv <- merge(msurv, years)
 
 msurv <- msurv %>%
   filter(n_years > 1)
+rm(years)
 
 msurv_industry <- msurv %>%
   filter(Survey_Lead == "Industry")
@@ -202,6 +229,31 @@ PCI <- msurv_rapid %>%
 
 msurv_rapid <- msurv_rapid %>%
   filter(Region_code != 3)
+
+
+# Laurent's function to see which plots were done in different years
+
+
+
+checkplots <- function(df, plots, other){
+  #df = dataframe
+  #plots = character ID of plot column
+  #other = character ID of the other column
+  blabla <- aggregate(df[,other], by=list(df[,plots]), FUN = function(x) as.character(unique(x)))
+  blabla <- blabla[lapply(blabla[,2], FUN = length)>1,]
+  return(blabla)
+}
+
+
+
+test <- checkplots(allplots, "Plot", "Year")
+
+
+
+
+
+
+
 
 
 
@@ -249,31 +301,6 @@ fr_sum <- field_rapid  %>%
 
 
 
-
-
-#checking to see if the results seem biased at all by field selection
-#create a new column that categorizes into 5 groups:
-#gis selected, field modified, field selected industry, field selected intensive, and field selected other
-
-
-
-prism <- prism %>%
-  mutate(comparison = Selection_method, 
-         comparison = ifelse(Selection_method == "field selected" & Survey_Lead == "Industry", "field selected - industry", comparison),
-         comparison = ifelse(Selection_method == "field selected" & Plot_type == "INTENSIVE", "field selected - intensive", comparison),
-         comparison = ifelse(comparison == "field selected", "field selected - other", comparison))
-                             
-
-
-
-#compare prism or allplots comparisons to see if counts seem biased
-  #if they aren;t, does it matter if the habitats were biased?
-
-
-
-
-
-
 ### why were plots gis selected field modified?
 
 
@@ -295,6 +322,156 @@ fmgs_sum <- fmgs  %>%
 
 
 
+#checking to see if the results seem biased at all by field selection
+#create a new column that categorizes into 5 groups:
+#gis selected, field modified, field selected industry, field selected intensive, and field selected other
+# a version of this is in 02_prep script
+
+
+#prism <- prism %>%
+#  mutate(comparison = Selection_method, 
+#         comparison = ifelse(Selection_method == "field selected" & Survey_Lead == "Industry", "field selected - industry", comparison),
+#         comparison = ifelse(Selection_method == "field selected" & Plot_type == "INTENSIVE", "field selected - intensive", comparison),
+#         comparison = ifelse(comparison == "field selected", "field selected - other", comparison))
+                             
+
+
+
+#compare prism comparisons to see if counts seem biased
+  #if they aren;t, does it matter if the habitats were biased?
+
+
+# sum total_birds by plot_date
+# mean total_birds by plot
+# compare the groups to see if they get different results
+
+
+test <- prism %>%
+  group_by(plot_date) %>%
+  summarize(sum_birds = sum(total_birds)) %>%
+  merge(allplots) %>%
+  group_by(Plot) %>%
+  summarize(mean_sum_birds = round(mean(sum_birds))) %>%
+  merge(allplots)
+
+test$comparison <- relevel(factor(test$comparison), ref = "gis selected")
+
+
+t_sum <- test %>%
+  group_by(comparison) %>%
+  summarize(mean_birds = mean(mean_sum_birds), 
+            sd_birds = sd(mean_sum_birds), 
+            cv_birds = (sd(mean_sum_birds)/mean(mean_sum_birds))*100,
+            length(unique(Plot)))
+
+
+lm_comp <- lm(mean_sum_birds ~ comparison, test)
+summary(lm_comp)
+
+
+
+# redo but just for shorebirds
+
+
+test_sb <- prism %>%
+  filter(Group == "Shorebirds") %>%
+  group_by(plot_date) %>%
+  summarize(sum_birds = sum(total_birds)) %>%
+  merge(allplots) %>%
+  group_by(Plot) %>%
+  summarize(mean_sum_birds = round(mean(sum_birds))) %>%
+  merge(allplots)
+
+test_sb$comparison <- relevel(factor(test_sb$comparison), ref = "gis selected")
+
+
+t_sum_sb <- test_sb %>%
+  group_by(comparison) %>%
+  summarize(mean_birds = mean(mean_sum_birds), 
+            sd_birds = sd(mean_sum_birds), 
+            #cv_birds = (sd(mean_sum_birds)/mean(mean_sum_birds))*100,
+            n_plots = length(unique(Plot)))
+
+
+lm_comp_sb <- lm(mean_sum_birds ~ comparison, test_sb)
+summary(lm_comp_sb)
+
+
+# what happens when you include habitat quality?
+
+
+
+lm_comp2 <- lm(mean_sum_birds ~ comparison + quality, test)
+summary(lm_comp2)
+
+lm_comp_sb2 <- lm(mean_sum_birds ~ comparison + quality, test_sb)
+summary(lm_comp_sb2)
+
+
+
+
+# what happens when you look at number of surveyors
+
+
+test$n_surveyors <- relevel(factor(test$n_surveyors), ref = 2)
+
+lm_surv <- lm(mean_sum_birds ~ factor(n_surveyors), test)
+summary(lm_surv)
+
+
+surv_sum <- test %>%
+  group_by(n_surveyors) %>%
+  summarize(mean_birds = mean(mean_sum_birds), 
+            sd_birds = sd(mean_sum_birds), 
+            length(unique(Plot)))
+
+
+
+
+test_sb$n_surveyors <- relevel(factor(test_sb$n_surveyors), ref = 2)
+
+lm_surv <- lm(mean_sum_birds ~ n_surveyors, test_sb)
+summary(lm_surv)
+
+test_sb$n_surveyors <- relevel(factor(test_sb$n_surveyors), ref = 1)
+
+
+surv_sum <- test_sb %>%
+  group_by(n_surveyors) %>%
+  summarize(mean_birds = mean(mean_sum_birds), 
+            sd_birds = sd(mean_sum_birds), 
+            length(unique(Plot)))
+
+
+
+
+## what are the plots with abnormal plot shapes?
+
+
+irr <- allplots %>%
+  filter(Plot_Shape == "irregular polygon")
+
+
+
+
+
+
+##### size
+
+
+small <- allplots %>%
+  filter(Plot_area < 0.09)
+
+large <- allplots %>%
+  filter(Plot_area > 0.2)
+
+
+
+
+##proportion surveyed
+
+ps <- allplots %>%
+  filter(Prop_surveyed < 0.5)
 
 
 

@@ -1,20 +1,21 @@
 ##### LOAD PACKAGES
 
 
-#library(MASS)
-library(tidyr)
+
+library(raster)
+library(ggplot2)
+library(lme4)
 library(lubridate)
+library(tidyverse)
+library(sf)
 #library(rgeos)
 #library(maptools)
 #library(rgdal)
 #library(reshape)
-library(raster)
 #library(SDMTools)
 #library(velox)
 #library(gdalUtils)
-library(plyr)
-library(dplyr)
-library(ggplot2)
+#library(MASS)
 #library(corrplot)
 #library(scales)
 #library(Hmisc)
@@ -23,7 +24,20 @@ library(ggplot2)
 #library(data.table)
 #library(FRK)
 #library(beepr)
-library(lme4)
+
+
+#-- Conflicts ------------------------------------------ tidyverse_conflicts() --
+# x lubridate::as.difftime() masks base::as.difftime()
+# x lubridate::date()        masks base::date()
+# x tidyr::expand()          masks Matrix::expand()
+# x tidyr::extract()         masks raster::extract()
+# x dplyr::filter()          masks stats::filter()
+# x lubridate::intersect()   masks raster::intersect(), base::intersect()
+# x dplyr::lag()             masks stats::lag()
+# x dplyr::select()          masks raster::select()
+# x lubridate::setdiff()     masks base::setdiff()
+# x lubridate::union()       masks raster::union(), base::union()
+
 
 
 
@@ -101,7 +115,7 @@ NPLAEA <-  CRS("+init=EPSG:3573")
 #### Read in raw data
 
 # Read in full PRISM dataset
-bigdata_raw <-read.csv("data/PRISM/PRISM 1994 to 2019.csv"
+bigdata_raw <-read.csv("data/PRISM/PRISM 1994 to 2019_20191210.csv"
                        , stringsAsFactors = FALSE, na.strings=c("", "NA"))
 
 

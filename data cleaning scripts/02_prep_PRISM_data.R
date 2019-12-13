@@ -41,6 +41,8 @@ bigdata <- bigdata %>%
               "Count_Probable_nest", "Count_Pairs", "Count_Male", 
               "Count_Female", "Count_Unknown_sex"), as.numeric) %>%
   mutate(Date = mdy(Date))
+
+
   
 #not done yet:
 #start: character to posixct     # these contain two different formats: 00:00 and 00:00:00. 
@@ -63,55 +65,40 @@ bigdata$Standardized_Species_Code <- toupper(bigdata$Standardized_Species_Code)
 
 
 
-#fixing mistakes
-
-bigdata <- bigdata %>%
-  mutate(Standardized_Species_Code = ifelse(Standardized_Species_Code == "AGPL", "AMGP", Standardized_Species_Code)) %>%
-  mutate(Standardized_Species_Code = ifelse(Standardized_Species_Code == "RAVE", "CORA", Standardized_Species_Code)) %>%
-  mutate(Group = ifelse(Standardized_Species_Code == "KIEI", "Waterfowl", Group)) %>%
-  mutate(Group = ifelse(Standardized_Species_Code == "LALO", "Passerines", Group)) %>%
-  mutate(Group = ifelse(Standardized_Species_Code == "GWFG", "Waterfowl", Group)) 
 
 #making all no data values into NAs
 
 bigdata <- bigdata %>%
   mutate(Group = ifelse(Group == "not applicable", NA, Group)) %>%
-  mutate(Group = ifelse(Group == "not recorded", NA, Group))
-  
+  mutate(Group = ifelse(Group == "not recorded", NA, Group)) %>%
+  mutate(Start_time_1 = ifelse(Start_time_1 %in% c("not recorded", "not applicable", "no data"), NA, Start_time_1))
 
-#add a row for the plot that has no on plot observation row
+#getting rid of one blank cell in human development
 
-add <- filter(bigdata, Standardized_Plot_Name == "KWI-1314B") %>%
-  filter(Standardized_Species_Code == first(Standardized_Species_Code)) %>%
-  mutate(Standardized_Species_Code = "XXXX") %>%
-  mutate(Sighting_code = 1) %>%
-  mutate_at(c("Count_Nests_found", 
-              "Count_Probable_nest", "Count_Pairs", "Count_Male", 
-              "Count_Female", "Count_Unknown_sex"), function (x) x*0) %>%
-  mutate(Group = NA) %>%
-  mutate(Sighting_code_short = "on plot") %>%
-  mutate(Sighting_code_desc = "Sighting of birds inside the plot boundaries.")
-  
-bigdata <- rbind(bigdata, add)
-rm(add)
+bigdata$Human_development_details[bigdata$Human_development_details == " "] <- "not recorded"
 
 
+#count the number of surveyors
 
-
-
-for(i in 1:nrow(bigdata)) {
-  bigdata$n_surveyors[i] <- count.not.na(c(
-    bigdata$Surveyor_1_Initials[i],
-    bigdata$Surveyor_2_Initials[i],
-    bigdata$Surveyor_3_Initials[i],
-    bigdata$Surveyor_4_Initials[i], 
-    bigdata$Surveyor_5_Initials[i],
-    bigdata$Surveyor_6_Initials[i]))
-}
+#for(i in 1:nrow(bigdata)) {
+#  bigdata$n_surveyors[i] <- count.not.na(c(
+#    bigdata$Surveyor_1_Initials[i],
+#    bigdata$Surveyor_2_Initials[i],
+#    bigdata$Surveyor_3_Initials[i],
+#    bigdata$Surveyor_4_Initials[i], 
+#    bigdata$Surveyor_5_Initials[i],
+#    bigdata$Surveyor_6_Initials[i]))
+#}
 
 
 
+#edit the time column so that formats are uniform 
+#NAs don't parse well with lubridate. 
+#I haven't bothered turning in times with hm() becasue of the NAs becasue only planning to use it to make ID vars right now
 
+bigdata <- bigdata %>%
+  mutate(Start_time_1 = ifelse(nchar(Start_time_1) == 4, paste("0", Start_time_1, sep = ""), Start_time_1),
+         Start_time_1 = ifelse(nchar(Start_time_1) == 8, substr(Start_time_1, 1, 5), Start_time_1))
 
 
 
@@ -125,6 +112,7 @@ prism <- dplyr::select(bigdata,
                        Day,
                        Date,
                        yday,
+                       Start_time_1,
                        Region_name, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
                        Region_code, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
                        Sub_region_name, #170 plots with NAs. 89 as above. 78 in Foxe basin becasue of differences in how subregions were calculated over time (2019 had no subregions). 3 in North Archipelago are confusing, but may stem from weird subregions that overlap near Alert (see email from Laurent RE Tyler's map of subregions)
@@ -146,7 +134,8 @@ prism <- dplyr::select(bigdata,
                        Count_Male,
                        Count_Female,
                        Count_Unknown_sex,
-                       n_surveyors)
+                       #n_surveyors,
+                       Human_development_details)
 
 
 #start = Start_time_1,
@@ -179,11 +168,11 @@ prism <- prism %>%
 
 
 
-#create a total birds column
+#create a total birds column and unique survey identifier
 
 prism <- prism %>%
   mutate(total_birds = (Count_Nests_found*2) + (Count_Probable_nest*2) + (Count_Pairs*2) + Count_Male + Count_Female + Count_Unknown_sex) %>%
-  mutate(plot_date = paste(Plot, Date)) 
+  mutate(plot_date = paste(Plot, Date, Start_time_1)) 
 
 #%>%
 #  group_by(plot_date) %>%
@@ -202,6 +191,34 @@ prism <- prism %>%
 
 
 
+# add a column for comparing plot selection methods biases
+
+
+
+prism <- prism %>%
+  mutate(comparison = Selection_method, 
+         comparison = ifelse(Selection_method == "field selected" & Survey_Lead == "Industry", "field selected - industry", comparison),
+         comparison = ifelse(Selection_method == "field selected" & Plot_type == "INTENSIVE", "field selected - intensive", comparison),
+         comparison = ifelse(comparison == "field selected", "field selected - other", comparison))
+
+
+
+
+#add a column that subs in quality code 1 when quality code 2 is missing
+
+prism <- prism %>%
+  mutate(quality = ifelse(is.na(Quality_2), Quality_1, Quality_2),
+         quality = ifelse(quality %in% c(1,2,3), quality, NA))
+
+
+
+
+
+#### filtering out data that is problematic
+
+#remove plots from Prince Charles Island 1996
+
+
 
 
 
@@ -215,6 +232,7 @@ allplots <- dplyr::select(prism,
                           Day,
                           Date,
                           yday,
+                          Start_time_1,
                           Region_name, 
                           Region_code, 
                           Sub_region_name, 
@@ -222,25 +240,40 @@ allplots <- dplyr::select(prism,
                           Plot_type,
                           Survey_method,
                           Plot_Shape,
-                          Quality_1,
-                          Quality_2, 
-                          Prop_surveyed, 
+                          #Quality_1,
+                          #Quality_2, 
+                          quality,
+                          #Prop_surveyed, 
                           Selection_method, 
                           Plot_area,
-                          n_surveyors, 
-                          comparison)
+                          #n_surveyors, 
+                          comparison, 
+                          plot_date,
+                          Human_development_details)
 
 allplots <- distinct(allplots) #2540 unique plots, 747 were surveyed more than once
 
 
-#~300 plots were surveyed by 3 or more people
 
 
 
+## only shorebird observations
 
 
+sb_list <- prism %>%
+  filter(Group == "Shorebirds") %>%
+  select(Species) %>%
+  unique() %>%
+  na.omit() %>%
+  pull(Species)
+  
+  
 
-
+sb <- prism %>%
+  filter(Group == "Shorebirds")
+  
+#### I should apply some of the rules like taking the means of plots, becasue then the plot_date column will be irrelevant. 
+#### I will need to add a plot_year column instead though
 
 
 #plan of what I need to do
