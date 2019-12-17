@@ -1,6 +1,11 @@
 #notes about specific columns
 
 
+# all of the column names so that I can search for column names, subset by column number etc
+cols_bigdata <- data.frame(colnames(bigdata))
+
+
+
 
 
 

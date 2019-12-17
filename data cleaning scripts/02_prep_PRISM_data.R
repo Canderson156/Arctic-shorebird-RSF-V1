@@ -14,6 +14,7 @@
 
 
 
+### Editing the raw data ###########################################################################################################################
 
 
 
@@ -103,39 +104,47 @@ bigdata <- bigdata %>%
 
 
 
+### Filtering to all valid surveys ###########################################################################################################################
+
+
+
 # select only the columns containing required data
-prism <- dplyr::select(bigdata,
-                       Plot = Standardized_Plot_Name, #2855 unique plots
-                       Survey_Lead,
-                       Year, #1994-2019
-                       Month, #mostly June, some July, 475 "not applicable"
-                       Day,
-                       Date,
-                       yday,
-                       Start_time_1,
-                       Region_name, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
-                       Region_code, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
-                       Sub_region_name, #170 plots with NAs. 89 as above. 78 in Foxe basin becasue of differences in how subregions were calculated over time (2019 had no subregions). 3 in North Archipelago are confusing, but may stem from weird subregions that overlap near Alert (see email from Laurent RE Tyler's map of subregions)
-                       Sub_region_code, #same as above
-                       Plot_type,
-                       Survey_method,
-                       Plot_Shape,
-                       Quality_1 = GIS_Habitat_Quality_2_Code,
-                       Quality_2 = GIS_Habitat_Quality_1_Code, # how were these defined, when were they changed, which one is the one we should use, are these being redone?
-                       Prop_surveyed = Proportion_of_Plot_surveyed, 
-                       Selection_method = Plot_Selection_Method, # why are there so many field selected plots?
-                       Plot_area = Plot_area_km2,
-                       Sighting_code, 
-                       Species = Standardized_Species_Code,  #XXXX means nothing was observed
-                       Group,
-                       Count_Nests_found,
-                       Count_Probable_nest,
-                       Count_Pairs,
-                       Count_Male,
-                       Count_Female,
-                       Count_Unknown_sex,
-                       #n_surveyors,
-                       Human_development_details)
+prism <- select(bigdata,
+                Plot = Standardized_Plot_Name, #2855 unique plots
+                Survey_Lead,
+                Year, #1994-2019
+                Month, #mostly June, some July, 475 "not applicable"
+                Day,
+                Date,
+                yday,
+                Start_time_1,
+                Region_name, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
+                Region_code, #89 plots with NAs that are outside the regions (south of Mackenzie Delta)
+                Sub_region_name, #170 plots with NAs. 89 as above. 78 in Foxe basin becasue of differences in how subregions were calculated over time (2019 had no subregions). 3 in North Archipelago are confusing, but may stem from weird subregions that overlap near Alert (see email from Laurent RE Tyler's map of subregions)
+                Sub_region_code, #same as above
+                Plot_type,
+                Survey_method,
+                Plot_Shape,
+                Quality_1 = GIS_Habitat_Quality_2_Code,
+                Quality_2 = GIS_Habitat_Quality_1_Code, # how were these defined, when were they changed, which one is the one we should use, are these being redone?
+                Prop_surveyed = Proportion_of_Plot_surveyed, 
+                Selection_method = Plot_Selection_Method, # why are there so many field selected plots?
+                Plot_area = Plot_area_km2,
+                Sighting_code, 
+                Species = Standardized_Species_Code,  #XXXX means nothing was observed
+                Group,
+                Count_Nests_found,
+                Count_Probable_nest,
+                Count_Pairs,
+                Count_Male,
+                Count_Female,
+                Count_Unknown_sex,
+                #n_surveyors,
+                Human_development_details, 
+                GIS_UTM_1_zone,
+                UTM_1_Easting, 
+                UTM_1_Northing,
+                UTM_1_Type)
 
 
 #start = Start_time_1,
@@ -168,11 +177,13 @@ prism <- prism %>%
 
 
 
-#create a total birds column and unique survey identifier
+#create a total birds column and unique survey identifiers
 
 prism <- prism %>%
   mutate(total_birds = (Count_Nests_found*2) + (Count_Probable_nest*2) + (Count_Pairs*2) + Count_Male + Count_Female + Count_Unknown_sex) %>%
-  mutate(plot_date = paste(Plot, Date, Start_time_1)) 
+  mutate(plot_date = paste(Plot, Date, Start_time_1)) %>%
+  mutate(plot_year = paste(Plot, Year)) %>%
+  mutate(plot_species = paste(Plot, Species))
 
 #%>%
 #  group_by(plot_date) %>%
@@ -217,14 +228,38 @@ prism <- prism %>%
 #### filtering out data that is problematic
 
 #remove plots from Prince Charles Island 1996
+#remove plots that were surveyed in 2019?
+
+prism <- prism %>%
+  filter(!(Region_code == 3 & Year == 1996))
 
 
+
+#keep only the rows with a southwest corner
+
+prism <- prism %>%
+  filter(UTM_1_Type == "SW corner")
+
+#why are the PCI ones from this year missing? 
+
+
+
+
+
+
+
+
+
+
+
+
+### Filtering to all unique surveys (no counts) ###########################################################################################################################
 
 
 
 #create a dataset of all surveyed plots
 
-allplots <- dplyr::select(prism,
+allsurveys <- dplyr::select(prism,
                           Plot,
                           Survey_Lead,
                           Year, 
@@ -249,11 +284,55 @@ allplots <- dplyr::select(prism,
                           #n_surveyors, 
                           comparison, 
                           plot_date,
-                          Human_development_details)
+                          plot_year,
+                          Human_development_details,
+                          GIS_UTM_1_zone,
+                          UTM_1_Easting, 
+                          UTM_1_Northing)
 
-allplots <- distinct(allplots) #2540 unique plots, 747 were surveyed more than once
+allsurveys <- distinct(allsurveys) #2540 unique plots, 747 were surveyed more than once
 
 
+
+
+### Filtering to all unique plots (no counts) ###########################################################################################################################
+
+allplots <- allsurveys %>%
+  group_by(Plot) %>%
+  mutate(UTM_Easting = mean(UTM_1_Easting),   #taking the mean of the UTM coordinates
+         UTM_Northing = mean(UTM_1_Northing)) %>%
+  ungroup() %>%
+  select(Plot,
+         #Species,
+         Survey_Lead,
+         Region_name, 
+         Region_code, 
+         Sub_region_name, 
+         Sub_region_code, 
+         Plot_type,
+         Survey_method,
+         #Plot_Shape, # a few plots differ between years
+         #quality, # a few plots differ between years
+         Selection_method, 
+         #Plot_area,
+         comparison,
+         #plot_species,
+         UTM_Zone = GIS_UTM_1_zone, 
+         UTM_Easting, 
+         UTM_Northing) %>%
+  distinct()
+  
+  
+
+
+
+
+
+
+
+
+
+### filtering to only shorebird data ###########################################################################################################################
 
 
 
@@ -268,29 +347,139 @@ sb_list <- prism %>%
   pull(Species)
   
   
+#all shorebirds, all years, all surveys
+#sb <- prism %>%
+#  filter(Group == "Shorebirds") %>%
 
+
+#all shorebirds, all years, mean of within year surveys
 sb <- prism %>%
-  filter(Group == "Shorebirds")
+  filter(Group == "Shorebirds") %>%
+  group_by(plot_year, Species) %>%
+  mutate(mean_birds_year = mean(total_birds)) %>%
+  select(Plot,
+         Species,
+         Survey_Lead,
+         Year, 
+         Region_name, 
+         Region_code, 
+         Sub_region_name, 
+         Sub_region_code, 
+         Plot_type,
+         Survey_method,
+         Plot_Shape,
+         quality,
+         Selection_method, 
+         Plot_area,
+         comparison,
+         Human_development_details,
+         plot_year,
+         plot_species,
+         mean_birds_year) %>%
+  distinct()
+
+
+
+
+#all shorebirds, mean between years (from mean within years)
+
+
+sb <- sb %>%
+  ungroup() %>%
+  group_by(Plot) %>%
+  ungroup() %>%
+  group_by(plot_species) %>%
+  mutate(mean_birds_all = mean(mean_birds_year)) %>%
+  select(Plot,
+         Species,
+         Survey_Lead,
+         Region_name, 
+         Region_code, 
+         Sub_region_name, 
+         Sub_region_code, 
+         Plot_type,
+         Survey_method,
+         #Plot_Shape, # a few plots differ between years
+         #quality, # a few plots differ between years
+         Selection_method, 
+         Plot_area,
+         comparison,
+         plot_species,
+         mean_birds_all) %>%
+  distinct()
   
-#### I should apply some of the rules like taking the means of plots, becasue then the plot_date column will be irrelevant. 
-#### I will need to add a plot_year column instead though
+
+# above, with all shorebird species added together
+
+SB <- sb %>%
+  ungroup() %>%
+  group_by(Plot) %>%
+  mutate(sum_shorebirds = sum(mean_birds_all)) %>%
+  select(Plot,
+         #Species,
+         Survey_Lead,
+         Region_name, 
+         Region_code, 
+         Sub_region_name, 
+         Sub_region_code, 
+         Plot_type,
+         Survey_method,
+         #Plot_Shape, # a few plots differ between years
+         #quality, # a few plots differ between years
+         Selection_method, 
+         #Plot_area,
+         comparison,
+         #plot_species,
+         sum_shorebirds) %>%
+  distinct()
 
 
-#plan of what I need to do
 
-
-# seperate these datasets:
-## a dataset that contain all shorebird observations
-## a dataset that contains all goose observations
-## a dataset that contain all survey plots
-## a dataset that combines all of these
+SB <- SB %>%
+  merge(allplots, all = TRUE) %>%
+  mutate(sum_shorebirds = ifelse(is.na(sum_shorebirds), 0, round(sum_shorebirds)))
 
 
 
+## use my expand grid from previous data cleaning script when I want to model by species
 
 
 
 
 
+### Adding goose data ###########################################################################################################################
+
+
+geese_sp <- c("CAGO", "SNGO", "ROGO", "CACG", "GWFG")
+
+geese_plots <- prism %>%
+  filter(Species %in% geese_sp) %>%
+  select(Plot,
+         plot_date,
+         plot_year,
+         total_birds) %>%
+  group_by(plot_date) %>% 
+  mutate(sum_geese_survey = sum(total_birds)) %>%
+  ungroup() %>%
+  select(-plot_date, -total_birds) %>%
+  distinct() %>%
+  group_by(plot_year) %>%
+  mutate(mean_geese_year = mean(sum_geese_survey)) %>%
+  ungroup() %>%
+  select(-plot_year, -sum_geese_survey) %>%
+  distinct() %>%
+  group_by(Plot) %>% 
+  mutate(mean_geese = round(mean(mean_geese_year))) %>%
+  ungroup() %>%
+  select(-mean_geese_year) %>%
+  distinct()
+  
+  
+
+SB <- SB %>%
+  merge(geese_plots, all = TRUE) %>%
+  mutate(mean_geese = ifelse(is.na(mean_geese), 0, mean_geese))
+
+rm(geese_sp, geese_plots, sb)
 
 
