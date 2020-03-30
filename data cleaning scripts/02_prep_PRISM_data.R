@@ -3,21 +3,23 @@
 ## Script for producing:
 
 ## bigdata_raw     = all data imported from csv file with no edits made to it
-## bigdata         = all data, editing classes, capitalization, NAs
-## prism           = filtered to include 
+## bigdata         = all data, editing data classes of columns, capitalization, NAs
+## prism           = filtered to include the columns that seem useful for analyzing,
+##                   only on plot rapid surveys, exclude plots that are questionable
+## allsurveys      = One record for every survey that was done. Some plots were surveyed multiple times
+## allplots        = One record for every plot
+## sb and SB       = Several different iterations summarizing shorebird counts 
+##                   (per survey or per plot, seperate or aggregated by year, by species or grouped)
 
-
-## a dataset that contain all shorebird observations
-## a dataset that contains all goose observations
-## a dataset that contain all survey plots    --  would prism work for this or did I filter out anything that I would want?
-## a dataset that combines all of these
 
 
 
 ### Editing the raw data ###########################################################################################################################
 
 
-
+## TO DO:
+# Go through the documentation I created in December and Laurent's list of plots that he removed becasue they were sketchy.
+#      -> remove any plots that seem sketchy i.e. the human development ones
 
 
 
@@ -233,12 +235,14 @@ prism <- prism %>%
 prism <- prism %>%
   filter(!(Region_code == 3 & Year == 1996))
 
-
+prism <- prism %>%
+  filter(!(Year == 2019))
 
 #keep only the rows with a southwest corner
+  ###why had I done this? which ones don't have a southwest corner? 
 
-prism <- prism %>%
-  filter(UTM_1_Type == "SW corner")
+#prism <- prism %>%
+#  filter(UTM_1_Type == "SW corner")
 
 #why are the PCI ones from this year missing? 
 
@@ -286,12 +290,12 @@ allsurveys <- dplyr::select(prism,
                           plot_date,
                           plot_year,
                           Human_development_details,
-                          GIS_UTM_1_zone,
+                          UTM_1_Type,
+                          UTM_Zone = GIS_UTM_1_zone,
                           UTM_1_Easting, 
                           UTM_1_Northing)
 
-allsurveys <- distinct(allsurveys) #2540 unique plots, 747 were surveyed more than once
-
+allsurveys <- distinct(allsurveys) 
 
 
 
@@ -317,7 +321,8 @@ allplots <- allsurveys %>%
          #Plot_area,
          comparison,
          #plot_species,
-         UTM_Zone = GIS_UTM_1_zone, 
+         UTM_1_Type,
+         UTM_Zone, 
          UTM_Easting, 
          UTM_Northing) %>%
   distinct()
@@ -475,7 +480,7 @@ geese_plots <- prism %>%
   distinct()
   
   
-
+#would I rather add this to the sb object that has individual species rather than summaries for all shorebirds? 
 SB <- SB %>%
   merge(geese_plots, all = TRUE) %>%
   mutate(mean_geese = ifelse(is.na(mean_geese), 0, mean_geese))

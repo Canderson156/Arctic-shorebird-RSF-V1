@@ -22,8 +22,10 @@ library(reshape2)
 #library(pastecs)
 #library(psych)
 #library(data.table)
-#library(FRK)
+library(FRK)
 #library(beepr)
+library(rgdal)
+library(sp)
 
 
 #-- Conflicts ------------------------------------------ tidyverse_conflicts() --
